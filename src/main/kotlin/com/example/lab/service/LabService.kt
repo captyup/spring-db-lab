@@ -28,21 +28,6 @@ class LabService(
         Thread.sleep(5000)
     }
 
-    fun longTransactionRefactored(orderId: Long) {
-        // Step 1: 先更新 DB
-        updateStatus(orderId, "PROCESSING")
-
-        // Step 2: 外部 API 呼叫 (不佔用事務)
-        Thread.sleep(5000)
-    }
-
-    @Transactional
-    fun updateStatus(orderId: Long, status: String) {
-        val order = orderRepository.findById(orderId).orElseThrow()
-        order.status = status
-        orderRepository.save(order)
-    }
-
 
     // 2. N+1 查詢問題 (N+1 Query)
     // ---------------------------------------------------------
@@ -52,14 +37,6 @@ class LabService(
         return orders.map { order ->
             // 存取 LAZY 加載的 items，每個 order 都觸發一條額外 SQL
             order.items.joinToString { it.productName } 
-        }
-    }
-
-    @Transactional(readOnly = true)
-    fun nPlusOneRefactored(): List<String> {
-        val orders = orderRepository.findAllWithItemsJoinFetch() // 1 條 SQL (Join Fetch)
-        return orders.map { order ->
-            order.items.joinToString { it.productName }
         }
     }
 
@@ -86,28 +63,12 @@ class LabService(
         // 注意：這裡沒呼叫 save()，但交易結束時 Hibernate 會自動 Flush 並 Update DB！
     }
 
-    @Transactional
-    fun dirtyCheckingRefactored(orderId: Long) {
-        val order = orderRepository.findById(orderId).orElseThrow()
-        // 手動脫離 Persistence Context
-        entityManager.detach(order)
-        order.status = "TEMP_STATUS_FOR_CALCULATION"
-        // 不會觸發更新
-    }
-
 
     // 5. 自我調用失效 (Self-invocation)
     // ---------------------------------------------------------
     fun selfInvocationVulnerable(orderId: Long) {
         // 直接調用內部的 @Transactional 方法，AOP 代理失效，不會開啟事務
         updateOrderInTransaction(orderId)
-    }
-
-    @Transactional
-    fun selfInvocationRefactored(orderId: Long) {
-        // 方案一：從 ApplicationContext 取得代理物件
-        val proxy = applicationContext.getBean(LabService::class.java)
-        proxy.updateOrderInTransaction(orderId)
     }
 
     @Transactional
@@ -124,15 +85,6 @@ class LabService(
         return orderRepository.findById(orderId).orElseThrow()
     }
     
-    // 修復方案：在 Service 層完成 DTO 轉換
-    @Transactional(readOnly = true)
-    fun getOrderDto(orderId: Long): OrderDto {
-        val order = orderRepository.findById(orderId).orElseThrow()
-        return OrderDto(
-            orderNumber = order.orderNumber,
-            items = order.items.map { it.productName }
-        )
-    }
 
     // 7. 事務回滾陷阱 (Transaction Rollback Trap)
     // ---------------------------------------------------------
@@ -146,16 +98,6 @@ class LabService(
         // 拋出 Checked Exception (Exception)
         // 預設情況下，Spring 不會回滾！
         throw Exception("Oops! Checked Exception occurred.")
-    }
-
-    @Transactional(rollbackFor = [Exception::class])
-    @Throws(Exception::class)
-    fun rollbackRefactored(orderId: Long) {
-        val order = orderRepository.findById(orderId).orElseThrow()
-        order.status = "SAFE_STATUS"
-        orderRepository.save(order)
-        
-        throw Exception("Oops! I will rollback now.")
     }
 
     // 初始化測試資料
@@ -172,5 +114,3 @@ class LabService(
         orderRepository.saveAll(listOf(order1, order2))
     }
 }
-
-data class OrderDto(val orderNumber: String, val items: List<String>)

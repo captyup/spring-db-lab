@@ -22,8 +22,8 @@ class Order(
     @OneToMany(mappedBy = "order", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
     var items: MutableList<OrderItem> = mutableListOf(),
 
-    @Version
-    var version: Long = 0,
+    // 移除 @Version 以模擬脆弱狀態
+    // var version: Long = 0,
 
     @Column(nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now()
