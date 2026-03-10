@@ -35,41 +35,79 @@ curl -X POST http://localhost:8080/api/lab/init
 
 ### 實驗 1：長事務 (Long Transaction)
 *   **痛點**：在 `@Transactional` 中執行耗時的非資料庫操作，會導致 Connection Pool 耗盡。
-*   **代碼**：`LabService.longTransactionVulnerable`。
-*   **Demo**：同時發送 3 個併發請求，觀察 Connection Timeout。
+*   **Step A (問題代碼)**：`LabService.longTransactionVulnerable`。
+*   **Step B (Demo 方式)**：
+    首先，確保 `application.properties` 中限制了連線池大小（例如 `maximum-pool-size=2`）。
+    接著，同時發送 3 個併發請求：
+    ```bash
+    # 同時發送 3 個請求，前 2 個會佔滿連線池，第 3 個會因為超時而失敗 (HTTP 500)
+    curl -X POST "http://localhost:8080/api/lab/long-tx/vulnerable?id=1" & \
+    curl -X POST "http://localhost:8080/api/lab/long-tx/vulnerable?id=1" & \
+    curl -v -X POST "http://localhost:8080/api/lab/long-tx/vulnerable?id=1" & \
+    wait
+    ```
 *   **挑戰**：如何重構此方法，讓連線在執行耗時操作前就釋放？
 
 ### 實驗 2：N+1 查詢問題 (N+1 Query)
 *   **痛點**：查詢多筆資料時，Lazy Loading 導致迴圈內不斷發送額外的 SELECT。
-*   **代碼**：`LabService.nPlusOneVulnerable`。
-*   **Demo**：觀察日誌，查詢 2 筆訂單卻產生了 3 條 SQL。
+*   **Step A (問題代碼)**：`LabService.nPlusOneVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    # 觀察控制台日誌：會看到 1 條查詢 Order 的 SQL + N 條查詢 OrderItem 的 SQL
+    curl http://localhost:8080/api/lab/n-plus-one/vulnerable
+    ```
 *   **挑戰**：如何改寫 Repository 或查詢方式，將 SQL 數量降為 1 條？
 
 ### 實驗 3：併發衝突 (Optimistic Locking)
 *   **痛點**：高併發下，後發生的更新會覆蓋先發生的更新（遺失更新）。
-*   **代碼**：`LabService.optimisticLockingVulnerable`。
-*   **Demo**：執行測試 `ConcurrencyTest.kt`。
+*   **Step A (問題代碼)**：`LabService.optimisticLockingVulnerable`。
+*   **Step B (Demo 方式)**：
+    執行整合測試 `ConcurrencyTest.kt`。
+    ```bash
+    ./gradlew test --tests "com.example.lab.ConcurrencyTest"
+    ```
+    *(註：在 main 分支中，由於尚未加上 @Version，測試預期會因為數據被蓋掉而失敗，或者你可以觀察資料庫最終金額是最後一個請求的值。)*
 *   **挑戰**：如何在 Entity 中引入版本控制，讓第二次更新拋出異常？
 
 ### 實驗 4：髒檢查副作用 (Dirty Checking)
 *   **痛點**：Hibernate 自動將 Managed 狀態的變更同步回資料庫，即使沒呼叫 `save()`。
-*   **代碼**：`LabService.dirtyCheckingVulnerable`。
-*   **Demo**：呼叫端點後檢查資料庫，狀態是否被意外更改？
+*   **Step A (問題代碼)**：`LabService.dirtyCheckingVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/dirty-checking/vulnerable?id=1"
+    # 檢查資料庫：http://localhost:8080/h2-console
+    # 執行 SELECT * FROM ORDERS WHERE ID = 1; 你會發現狀態已被改為 TEMP_STATUS_FOR_CALCULATION
+    ```
 *   **挑戰**：在不刪除修改邏輯的前提下，如何阻止自動更新？
 
 ### 實驗 5：自我調用失效 (Self-invocation)
 *   **痛點**：內部方法直接呼叫另一個 `@Transactional` 方法時，代理失效，導致事務不生效。
-*   **代碼**：`LabService.selfInvocationVulnerable`。
+*   **Step A (問題代碼)**：`LabService.selfInvocationVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/self-invocation/vulnerable?id=1"
+    # 觀察日誌：你會發現並沒有開啟新的 Transaction，且若在方法內拋出異常，資料庫不會 Rollback。
+    ```
 *   **挑戰**：如何透過 AOP 代理呼叫同類別內的方法？
 
 ### 實驗 6：懶加載異常 (Lazy Init Exception)
 *   **痛點**：Session 關閉後存取 Lazy 屬性。
-*   **代碼**：`LabController.lazyInitVulnerable`。
+*   **Step A (問題代碼)**：`LabController.lazyInitVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    # 觀察：前端會收到 500 錯誤，日誌顯示 LazyInitializationException
+    curl "http://localhost:8080/api/lab/lazy-init/vulnerable?id=1"
+    ```
 *   **挑戰**：如何避免在 Controller 層存取 Entity 關聯，或者確保 Session 持續？
 
 ### 實驗 7：事務回滾陷阱 (Transaction Rollback Trap)
 *   **痛點**：Spring 預設不對 Checked Exception 進行回滾。
-*   **代碼**：`LabService.rollbackVulnerable`。
+*   **Step A (問題代碼)**：`LabService.rollbackVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/rollback/vulnerable?id=1"
+    # 觀察：雖然拋出了異常，但檢查資料庫，狀態居然已經變更了（沒回滾）！
+    ```
 *   **挑戰**：如何設定讓特定的 Exception 觸發 Rollback？
 
 ---
