@@ -180,6 +180,30 @@ class LabService(
         throw RuntimeException("為訂單 [$orderId] 寫入 Log [$action] 失敗！發生錯誤導致整筆交易回滾。")
     }
 
+    @Transactional
+    fun saveAndFlushRefactored(orderId: Long) {
+        val order = orderRepository.findById(orderId).orElseThrow()
+        order.status = "PAID"
+        
+        // 直接 save 即可，不需要 flush，Transaction Commit 時自然會 Flush
+        orderRepository.save(order)
+        
+        try {
+            // 必須透過代理物件呼叫，才能讓 REQUIRES_NEW 生效
+            val proxy = applicationContext.getBean(LabService::class.java)
+            proxy.writeActionLogRequiresNew(orderId, "Order paid")
+        } catch (e: Exception) {
+            // 攔截異常，避免回傳至外層事務
+            println("Caught exception: ${e.message}")
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    fun writeActionLogRequiresNew(orderId: Long, action: String) {
+        // 模擬寫入 Log 發生異常
+        throw RuntimeException("寫入 Log 失敗！但因為是 REQUIRES_NEW，只會 Rollback 自己，不會影響訂單的更新。")
+    }
+
     // 初始化測試資料
     @Transactional
     fun initData() {

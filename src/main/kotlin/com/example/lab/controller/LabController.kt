@@ -63,4 +63,7 @@ class LabController(private val labService: LabService) {
     // 8. saveAndFlush Misconception
     @PostMapping("/save-and-flush/vulnerable")
     fun saveAndFlushMisconception(@RequestParam id: Long) = labService.saveAndFlushMisconception(id)
+
+    @PostMapping("/save-and-flush/refactored")
+    fun saveAndFlushRefactored(@RequestParam id: Long) = labService.saveAndFlushRefactored(id)
 }

@@ -122,7 +122,11 @@ curl -X POST http://localhost:8080/api/lab/init
     curl -X POST "http://localhost:8080/api/lab/save-and-flush/vulnerable?id=1"
     # 觀察：日誌會顯示先執行了 UPDATE ORDERS 的 SQL，但隨後因為寫入 Log 發生異常導致 Rollback，最後檢查資料庫，訂單狀態實際並未變更。
     ```
-*   **挑戰**：理解 `flush` 與 `commit` 的差異，以及如果需要確保留存紀錄（如 Log），該如何善用 `REQUIRES_NEW` 獨立事務。
+*   **Step C (修復方案)**：參考 `LabService.saveAndFlushRefactored`。改回使用 `save()`（不強制 Flush），並將可能有例外風險的 Log 寫入動作抽出，加上 `@Transactional(propagation = Propagation.REQUIRES_NEW)`。即使 Log 發生異常，也不會影響訂單主流程的 Commit。
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/save-and-flush/refactored?id=1"
+    # 觀察：日誌顯示寫入 Log 發生異常（被 catch 住），但訂單狀態仍成功更新為 PAID。
+    ```
 
 ---
 
