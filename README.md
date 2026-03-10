@@ -59,15 +59,23 @@ curl -X POST http://localhost:8080/api/lab/init
 *   **挑戰**：如何改寫 Repository 或查詢方式，將 SQL 數量降為 1 條？
 
 ### 實驗 3：併發衝突 (Optimistic Locking)
-*   **痛點**：高併發下，後發生的更新會覆蓋先發生的更新（遺失更新）。
+*   **痛點**：高併發下，後發生的更新會直接覆蓋先發生的更新（遺失更新 Lost Update），且系統不會報錯。
 *   **Step A (問題代碼)**：`LabService.optimisticLockingVulnerable`。
-*   **Step B (Demo 方式)**：
-    執行整合測試 `ConcurrencyTest.kt`。
+*   **Step B (複現問題)**：
+    目前 `main` 分支的 `Order` Entity 尚未加上 `@Version`。執行整合測試：
     ```bash
+    # 預期結果：測試會「失敗」(Fail)，因為沒有拋出預期的樂觀鎖異常，數據被無聲覆蓋了。
     ./gradlew test --tests "com.example.lab.ConcurrencyTest"
     ```
-    *(註：在 main 分支中，由於尚未加上 @Version，測試預期會因為數據被蓋掉而失敗，或者你可以觀察資料庫最終金額是最後一個請求的值。)*
-*   **挑戰**：如何在 Entity 中引入版本控制，讓第二次更新拋出異常？
+*   **Step C (修復挑戰)**：
+    1. 前往 `src/main/kotlin/com/example/lab/entity/Entities.kt`。
+    2. 為 `Order` 類別補上 `@Version var version: Long = 0`。
+*   **Step D (驗證修復)**：
+    再次執行整合測試：
+    ```bash
+    # 預期結果：測試會「通過」(Pass)，證實系統已成功攔截併發衝突。
+    ./gradlew test --tests "com.example.lab.ConcurrencyTest"
+    ```
 
 ### 實驗 4：髒檢查副作用 (Dirty Checking)
 *   **痛點**：Hibernate 自動將 Managed 狀態的變更同步回資料庫，即使沒呼叫 `save()`。
