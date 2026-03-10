@@ -11,6 +11,7 @@
 6. [實驗 5：自我調用失效 (Self-invocation)](#實驗-5自我調用失效-self-invocation)
 7. [實驗 6：懶加載異常 (Lazy Init Exception)](#實驗-6懶加載異常-lazy-init-exception)
 8. [實驗 7：事務回滾陷阱 (Transaction Rollback Trap)](#實驗-7事務回滾陷阱-transaction-rollback-trap)
+9. [實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)](#實驗-8saveandflush-迷思-saveandflush-misconception)
 
 ---
 
@@ -117,6 +118,16 @@ curl -X POST http://localhost:8080/api/lab/init
     # 觀察：雖然拋出了異常，但檢查資料庫，狀態居然已經變更了（沒回滾）！
     ```
 *   **挑戰**：如何設定讓特定的 Exception 觸發 Rollback？
+
+### 實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)
+*   **痛點**：工程師在同一個 `@Transactional` 中，先更新訂單狀態並呼叫 `saveAndFlush()`，接著執行後續動作（例如寫入 Log 表）。當寫入 Log 失敗導致例外時，常會誤以為前面的 `saveAndFlush()` 已經「入庫定案」能倖免於難；但其實只要還在同一筆 Transaction 中，遇到 Exception 一樣會「全部」回滾。
+*   **Step A (實驗代碼)**：`LabService.saveAndFlushMisconception`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/save-and-flush/vulnerable?id=1"
+    # 觀察：日誌會顯示先執行了 UPDATE ORDERS 的 SQL，但隨後因為寫入 Log 發生異常導致 Rollback，最後檢查資料庫，訂單狀態實際並未變更。
+    ```
+*   **挑戰**：理解 `flush` 與 `commit` 的差異，以及如果需要確保留存紀錄（如 Log），該如何善用 `REQUIRES_NEW` 獨立事務。
 
 ---
 **💡 提示**：若需要參考正確答案，請切換至 `solutions` 分支。

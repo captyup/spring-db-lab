@@ -100,6 +100,28 @@ class LabService(
         throw Exception("Oops! Checked Exception occurred.")
     }
 
+    // 8. saveAndFlush 迷思 (saveAndFlush Misconception)
+    // ---------------------------------------------------------
+    @Transactional
+    fun saveAndFlushMisconception(orderId: Long) {
+        val order = orderRepository.findById(orderId).orElseThrow()
+        order.status = "PAID"
+        
+        // 工程師以為用 saveAndFlush 就可以確保訂單狀態有被「獨立」更新入庫
+        // 因為它會立刻觸發 UPDATE SQL 發送到資料庫，但其實還「尚未 Commit」
+        orderRepository.saveAndFlush(order)
+        
+        // 模擬後續操作：寫入 log table 發生錯誤 (例如違反 Constraints 或網路異常)
+        // 因為還在同一個 @Transactional 中，這會導致整筆交易回滾 (Rollback)
+        // 儘管前面已經 flush 送出了訂單狀態更新的 SQL，訂單狀態依然會退回原狀！證明 flush ≠ 獨立入庫定案
+        writeActionLog(orderId, "Order paid")
+    }
+
+    private fun writeActionLog(orderId: Long, action: String) {
+        // 模擬寫入 Log 時發生資料庫庫或其他錯誤
+        throw RuntimeException("為訂單 [$orderId] 寫入 Log [$action] 失敗！發生錯誤導致整筆交易回滾。")
+    }
+
     // 初始化測試資料
     @Transactional
     fun initData() {

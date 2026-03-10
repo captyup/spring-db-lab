@@ -37,4 +37,8 @@ class LabController(private val labService: LabService) {
     // 7. Rollback Trap
     @PostMapping("/rollback/vulnerable")
     fun rollbackVulnerable(@RequestParam id: Long) = labService.rollbackVulnerable(id)
+
+    // 8. saveAndFlush Misconception
+    @PostMapping("/save-and-flush/vulnerable")
+    fun saveAndFlushMisconception(@RequestParam id: Long) = labService.saveAndFlushMisconception(id)
 }
