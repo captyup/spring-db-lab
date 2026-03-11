@@ -1,6 +1,6 @@
 # 🚀 Spring Boot 資料庫操作實驗室 (Lab)
 
-這是一個專為資深開發者設計的教學實驗室，旨在展示並解決 Spring Boot / JPA / Hibernate 在高併發與大數據量場景下的 6+1 個經典痛點。
+這是一個專為資深開發者設計的教學實驗室，旨在展示並解決 Spring Boot / JPA / Hibernate 在高併發與大數據量場景下的 9 個經典痛點。
 
 ## 📋 目錄
 1. [環境初始化](#-環境初始化)
@@ -11,8 +11,8 @@
 6. [實驗 5：自我調用失效 (Self-invocation)](#實驗-5自我調用失效-self-invocation)
 7. [實驗 6：懶加載異常 (Lazy Init Exception)](#實驗-6懶加載異常-lazy-init-exception)
 8. [實驗 7：事務回滾陷阱 (Transaction Rollback Trap)](#實驗-7事務回滾陷阱-transaction-rollback-trap)
-8. [實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)](#實驗-8saveandflush-迷思-saveandflush-misconception)
-9. [實驗 9：一級快取與批量更新 (First-Level Cache & Bulk Update)](#實驗-9一級快取與批量更新-first-level-cache--bulk-update)
+9. [實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)](#實驗-8saveandflush-迷思-saveandflush-misconception)
+10. [實驗 9：一級快取與批量更新 (First-Level Cache & Bulk Update)](#實驗-9一級快取與批量更新-first-level-cache--bulk-update)
 
 ---
 
