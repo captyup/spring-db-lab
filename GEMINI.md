@@ -27,6 +27,7 @@
 | 6 | 懶加載異常 (Lazy Init) | `LabController.lazyInitVulnerable` |
 | 7 | 事務回滾陷阱 | `LabService.rollbackVulnerable` |
 | 8 | saveAndFlush 迷思 | `LabService.saveAndFlushMisconception` |
+| 9 | 一級快取與批量更新 | `LabService.firstLevelCacheVulnerable` |
 
 ## ⚠️ 開發規範與慣例
 - **Entity 開放性**: 專案使用了 `kotlin("plugin.jpa")` 與 `allOpen` 外掛，確保 JPA Entity 類別及其屬性在執行期是可開啟 (open) 的，以利 Hibernate 建立代理。

@@ -117,9 +117,49 @@ class LabService(
         writeActionLog(orderId, "Order paid")
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    fun writeActionLogRequiresNew(orderId: Long, action: String) {
+        // 模擬寫入 Log 發生異常
+        throw RuntimeException("寫入 Log 失敗！但因為是 REQUIRES_NEW，只會 Rollback 自己，不會影響訂單的更新。")
+    }
+
     private fun writeActionLog(orderId: Long, action: String) {
         // 模擬寫入 Log 時發生資料庫庫或其他錯誤
         throw RuntimeException("為訂單 [$orderId] 寫入 Log [$action] 失敗！發生錯誤導致整筆交易回滾。")
+    }
+
+    // 9. 一級快取與批量更新 (First-Level Cache & Bulk Update)
+    // ---------------------------------------------------------
+    @Transactional
+    fun firstLevelCacheVulnerable(orderId: Long): String {
+        // 1. 先讀取實體到一級快取 (Persistence Context)
+        val order = orderRepository.findById(orderId).orElseThrow()
+        val oldStatus = order.status // 例如 "NEW"
+
+        // 2. 透過 @Modifying JPQL 直接更新資料庫，這不會同步到一級快取
+        orderRepository.updateOrderStatus(orderId, "UPDATED_BY_JPQL")
+
+        // 3. 再次讀取「同一個 ID」的實體
+        // 由於 ID 1 已經在一級快取中，Hibernate 會直接回傳快取物件，而不去查資料庫
+        val staleOrder = orderRepository.findById(orderId).orElseThrow()
+        
+        return "Before: $oldStatus, After (Stale Cache): ${staleOrder.status}"
+    }
+
+    @Transactional
+    fun firstLevelCacheRefactored(orderId: Long): String {
+        // 1. 先讀取
+        val order = orderRepository.findById(orderId).orElseThrow()
+        val oldStatus = order.status
+
+        // 2. 透過帶有 clearAutomatically = true 的 JPQL 更新
+        orderRepository.updateOrderStatusClearCache(orderId, "UPDATED_WITH_CLEAR")
+
+        // 3. 再次讀取
+        // 因為一級快取已被清空，Hibernate 必須重新發送 SQL 查詢資料庫
+        val freshOrder = orderRepository.findById(orderId).orElseThrow()
+
+        return "Before: $oldStatus, After (Fresh Data): ${freshOrder.status}"
     }
 
     // 初始化測試資料

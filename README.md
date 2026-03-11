@@ -11,11 +11,13 @@
 6. [實驗 5：自我調用失效 (Self-invocation)](#實驗-5自我調用失效-self-invocation)
 7. [實驗 6：懶加載異常 (Lazy Init Exception)](#實驗-6懶加載異常-lazy-init-exception)
 8. [實驗 7：事務回滾陷阱 (Transaction Rollback Trap)](#實驗-7事務回滾陷阱-transaction-rollback-trap)
-9. [實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)](#實驗-8saveandflush-迷思-saveandflush-misconception)
+8. [實驗 8：saveAndFlush 迷思 (saveAndFlush Misconception)](#實驗-8saveandflush-迷思-saveandflush-misconception)
+9. [實驗 9：一級快取與批量更新 (First-Level Cache & Bulk Update)](#實驗-9一級快取與批量更新-first-level-cache--bulk-update)
 
 ---
 
 ## 🛠 環境初始化
+
 
 ### 1. 啟動應用程式
 本實驗室預設使用 **H2 In-Memory Database** (MySQL 相容模式)，無需安裝 Docker。
@@ -128,6 +130,16 @@ curl -X POST http://localhost:8080/api/lab/init
     # 觀察：日誌會顯示先執行了 UPDATE ORDERS 的 SQL，但隨後因為寫入 Log 發生異常導致 Rollback，最後檢查資料庫，訂單狀態實際並未變更。
     ```
 *   **挑戰**：理解 `flush` 與 `commit` 的差異，以及如果需要確保留存紀錄（如 Log），該如何善用 `REQUIRES_NEW` 獨立事務。
+
+### 實驗 9：一級快取與批量更新 (First-Level Cache & Bulk Update)
+*   **痛點**：使用 `@Modifying` 搭配 `@Query` 執行 JPQL 更新時，Hibernate 並不會主動更新一級快取 (Persistence Context)。若在同一個事務中再次讀取該實體，拿到的是舊的快取資料（Stale Data）。
+*   **Step A (問題代碼)**：`LabService.firstLevelCacheVulnerable`。
+*   **Step B (Demo 方式)**：
+    ```bash
+    curl -X POST "http://localhost:8080/api/lab/first-level-cache/vulnerable?id=1"
+    # 觀察：API 回傳的狀態依然是舊的（例如 NEW），但直接去資料庫看卻已經是 UPDATED。
+    ```
+*   **挑戰**：如何讓 `@Modifying` 自動清理一級快取，確保後續讀取到最新數據？
 
 ---
 **💡 提示**：若需要參考正確答案，請切換至 `solutions` 分支。
